@@ -129,7 +129,7 @@ class SportzxClient:
             r.raise_for_status()
             auth_token = r.json()["authToken"]["token"]
         except Exception as e:
-            print(f"Firebase Install error: {e}")
+            print(f"Firebase installation error: {e}")
             return None
 
         config_url = "https://firebaseremoteconfig.googleapis.com/v1/projects/446339309956/namespaces/firebase:fetch"
@@ -169,7 +169,7 @@ class SportzxClient:
     def get_channels(self) -> List[SportzxChannel]:
         api_url = self._get_api_url()
         if not api_url:
-            print("Non è stato possibile ottenere l'URL API")
+            print("Failed to retrieve the API URL")
             return []
 
         channels_list: List[SportzxChannel] = []
@@ -216,7 +216,7 @@ class SportzxClient:
                     keyid, key = api_val.split(":", 1)
 
                 channels_list.append(SportzxChannel(
-                    event_title=event.get("title", "Evento senza titolo"),
+                    event_title=event.get("title", "Untitled Event"),
                     event_id=eid,
                     event_cat=event.get("cat", ""),
                     event_name=event.get("eventInfo", {}).get("eventName", ""),
@@ -231,15 +231,15 @@ class SportzxClient:
         return channels_list
 
     # ────────────────────────────────────────────────────────────────
-    # Funzione per aumentare l'orario di +1 ora (solo HH:MM)
+    # Helper to shift a time string forward by 1 hour (HH:MM only)
     # ────────────────────────────────────────────────────────────────
     def _increase_time_by_one_hour(self, time_str: str) -> str:
         if not time_str or len(time_str) < 5 or ':' not in time_str:
             return time_str
 
         try:
-            # Prendiamo solo HH:MM (ignoriamo data se presente)
-            time_part = time_str.split()[-1][:5]  # prende l'ultima parte tipo "14:30"
+            # Extract only HH:MM (ignore date prefix if present)
+            time_part = time_str.split()[-1][:5]  # e.g. "14:30"
             hh, mm = map(int, time_part.split(':'))
             if not (0 <= hh <= 23 and 0 <= mm <= 59):
                 return time_part
@@ -263,40 +263,40 @@ class SportzxClient:
 
             included += 1
 
-            # Nome evento
-            evento = (ch.event_title or "Evento").strip()
+            # Event name
+            event = (ch.event_title or "Event").strip()
 
-            # Orario aumentato di +1 ora
-            orario_originale = ""
+            # Time shifted forward by 1 hour
+            original_time = ""
             if ch.event_time and len(ch.event_time) >= 11:
-                parti = ch.event_time.split()
-                if len(parti) >= 2:
-                    orario_originale = parti[1][:5]
+                parts = ch.event_time.split()
+                if len(parts) >= 2:
+                    original_time = parts[1][:5]
 
-            orario_aumentato = self._increase_time_by_one_hour(orario_originale)
-            orario_part = f" {orario_aumentato}" if orario_aumentato else ""
+            shifted_time = self._increase_time_by_one_hour(original_time)
+            time_part = f" {shifted_time}" if shifted_time else ""
 
-            # Canale tra parentesi se diverso
-            canale = ""
+            # Append channel title in parentheses if distinct from event name
+            channel_suffix = ""
             if ch.channel_title and ch.channel_title.strip():
-                tit_canale = ch.channel_title.strip()
-                if tit_canale.lower() not in evento.lower():
-                    canale = f" ({tit_canale})"
+                channel_title = ch.channel_title.strip()
+                if channel_title.lower() not in event.lower():
+                    channel_suffix = f" ({channel_title})"
 
-            nome_finale = f"{evento}{orario_part}{canale}".strip()
+            final_name = f"{event}{time_part}{channel_suffix}".strip()
 
-            # Pulizia
-            nome_pulito = re.sub(r'[^\w\s\-\:\(\)\,\.\']', ' ', nome_finale).strip()
+            # Sanitize
+            clean_name = re.sub(r'[^\w\s\-\:\(\)\,\.\']', ' ', final_name).strip()
 
-            gruppo = ch.event_cat.capitalize() if ch.event_cat else "Sportzx"
+            group = ch.event_cat.capitalize() if ch.event_cat else "Sportzx"
 
-            tvg = re.sub(r'[^a-z0-9]', '', nome_pulito.lower())
+            tvg = re.sub(r'[^a-z0-9]', '', clean_name.lower())
             tvg_id = tvg[:50] if tvg else f"sportzx-{ch.event_id[:8]}"
 
             extinf = (
                 f'#EXTINF:-1 tvg-id="{tvg_id}" '
                 f'tvg-logo="{generic_logo}" '
-                f'group-title="{gruppo}",{nome_pulito}'
+                f'group-title="{group}",{clean_name}'
             )
 
             lines.append(extinf)
@@ -308,37 +308,38 @@ class SportzxClient:
             lines.append(ch.stream_url)
             lines.append("")
 
-        contenuto = "\n".join(lines).rstrip()
+        content = "\n".join(lines).rstrip()
 
         try:
             with open(filename, "w", encoding="utf-8") as f:
-                f.write(contenuto + "\n")
-            print(f"Playlist creata: {filename}")
-            print(f"Canali inseriti: {included}")
+                f.write(content + "\n")
+            print(f"Playlist created: {filename}")
+            print(f"Channels included: {included}")
         except Exception as e:
-            print(f"Errore salvataggio: {e}")
+            print(f"Save error: {e}")
 
-        return contenuto
+        return content
 
 
 # ────────────────────────────────────────────────
+
 if __name__ == "__main__":
     client = SportzxClient(
-        excluded_categories=["adult", "test", "xxx"],
+        # excluded_categories=["adult", "test", "xxx"],
         timeout=15
     )
 
-    print("Recupero canali...")
-    canali = client.get_channels()
+    print("Fetching channels...")
+    channels = client.get_channels()
 
-    print(f"Trovati {len(canali)} canali in totale")
+    print(f"Found {len(channels)} channels total")
 
-    if canali:
-        print("Creo playlist Sportzx.m3u8 ...")
+    if channels:
+        print("Generating Sportzx.m3u8 playlist...")
         client.generate_m3u(
-            channels=canali,
-            filename="Sportzx.m3u8",
+            channels=channels,
+            filename="Sportzx.1.m3u8",
             generic_logo="https://i.postimg.cc/xdhSY2xq/does-anyone-have-transparent-sportzx-icons-they-can-share-v0-wyufeqaxobff1.png"
         )
     else:
-        print("Nessun canale trovato")
+        print("No channels found")
