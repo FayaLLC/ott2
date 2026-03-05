@@ -31,13 +31,17 @@ class SportzxClient:
         self.excluded_categories = set(c.lower() for c in (excluded_categories or []))
         self.timeout = timeout
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Dalvik/2.1.0 (Linux; Android 13)",
-            "Accept-Encoding": "gzip",
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": "Dalvik/2.1.0 (Linux; Android 13)",
+                "Accept-Encoding": "gzip",
+            }
+        )
 
     def _generate_aes_key_iv(self, s: str) -> tuple[bytes, bytes]:
-        CHARSET = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+!@#$%&="
+        CHARSET = (
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+!@#$%&="
+        )
 
         def u32(x: int) -> int:
             return x & 0xFFFFFFFF
@@ -45,17 +49,17 @@ class SportzxClient:
         data = s.encode("utf-8")
         n = len(data)
 
-        u = 0x811c9dc5
+        u = 0x811C9DC5
         for b in data:
             u = u32((u ^ b) * 0x1000193)
 
         key = bytearray(16)
         for i in range(16):
             b = data[i % n]
-            u = u32(u * 0x1f + (i ^ b))
+            u = u32(u * 0x1F + (i ^ b))
             key[i] = CHARSET[u % len(CHARSET)]
 
-        u = 0x811c832a
+        u = 0x811C832A
         for b in data:
             u = u32((u ^ b) * 0x1000193)
 
@@ -64,7 +68,7 @@ class SportzxClient:
         acc = 0
         while idx != 0x30:
             b = data[idx % n]
-            u = u32(u * 0x1d + (acc ^ b))
+            u = u32(u * 0x1D + (acc ^ b))
             iv[idx // 3] = CHARSET[u % len(CHARSET)]
             idx += 3
             acc = u32(acc + 7)
@@ -121,11 +125,16 @@ class SportzxClient:
             "fid": "eOaLWBo8S7S1oN-vb23mkf",
             "appId": "1:446339309956:android:b26582b5d2ad841861bdd1",
             "authVersion": "FIS_v2",
-            "sdkVersion": "a:18.0.0"
+            "sdkVersion": "a:18.0.0",
         }
 
         try:
-            r = self.session.post(install_url, json=install_body, headers=install_headers, timeout=self.timeout)
+            r = self.session.post(
+                install_url,
+                json=install_body,
+                headers=install_headers,
+                timeout=self.timeout,
+            )
             r.raise_for_status()
             auth_token = r.json()["authToken"]["token"]
         except Exception as e:
@@ -155,11 +164,16 @@ class SportzxClient:
             "appId": "1:446339309956:android:b26582b5d2ad841861bdd1",
             "platformVersion": "33",
             "sdkVersion": "22.1.2",
-            "packageName": "com.sportzx.live"
+            "packageName": "com.sportzx.live",
         }
 
         try:
-            r = self.session.post(config_url, json=config_body, headers=config_headers, timeout=self.timeout)
+            r = self.session.post(
+                config_url,
+                json=config_body,
+                headers=config_headers,
+                timeout=self.timeout,
+            )
             r.raise_for_status()
             return r.json().get("entries", {}).get("api_url")
         except Exception as e:
@@ -181,8 +195,11 @@ class SportzxClient:
             events = []
 
         valid_events = [
-            e for e in events
-            if isinstance(e, dict) and e.get("cat") and e["cat"].lower() not in self.excluded_categories
+            e
+            for e in events
+            if isinstance(e, dict)
+            and e.get("cat")
+            and e["cat"].lower() not in self.excluded_categories
         ]
 
         for event in valid_events:
@@ -215,18 +232,20 @@ class SportzxClient:
                 if api_val and ":" in api_val:
                     keyid, key = api_val.split(":", 1)
 
-                channels_list.append(SportzxChannel(
-                    event_title=event.get("title", "Untitled Event"),
-                    event_id=eid,
-                    event_cat=event.get("cat", ""),
-                    event_name=event.get("eventInfo", {}).get("eventName", ""),
-                    event_time=event_time_full,
-                    channel_title=ch.get("title"),
-                    stream_url=stream_url,
-                    keyid=keyid,
-                    key=key,
-                    api=api_val,
-                ))
+                channels_list.append(
+                    SportzxChannel(
+                        event_title=event.get("title", "Untitled Event"),
+                        event_id=eid,
+                        event_cat=event.get("cat", ""),
+                        event_name=event.get("eventInfo", {}).get("eventName", ""),
+                        event_time=event_time_full,
+                        channel_title=ch.get("title"),
+                        stream_url=stream_url,
+                        keyid=keyid,
+                        key=key,
+                        api=api_val,
+                    )
+                )
 
         return channels_list
 
@@ -234,13 +253,13 @@ class SportzxClient:
     # Helper to shift a time string forward by 1 hour (HH:MM only)
     # ────────────────────────────────────────────────────────────────
     def _increase_time_by_one_hour(self, time_str: str) -> str:
-        if not time_str or len(time_str) < 5 or ':' not in time_str:
+        if not time_str or len(time_str) < 5 or ":" not in time_str:
             return time_str
 
         try:
             # Extract only HH:MM (ignore date prefix if present)
             time_part = time_str.split()[-1][:5]  # e.g. "14:30"
-            hh, mm = map(int, time_part.split(':'))
+            hh, mm = map(int, time_part.split(":"))
             if not (0 <= hh <= 23 and 0 <= mm <= 59):
                 return time_part
 
@@ -249,16 +268,20 @@ class SportzxClient:
         except:
             return time_str
 
-    def generate_m3u(self,
-                     channels: List[SportzxChannel],
-                     filename: str = "Sportzx.m3u8",
-                     generic_logo: str = "https://via.placeholder.com/512/000000/FFFFFF?text=Sport") -> str:
+    def generate_m3u(
+        self,
+        channels: List[SportzxChannel],
+        filename: str = "Sportzx.m3u8",
+        generic_logo: str = "https://via.placeholder.com/512/000000/FFFFFF?text=Sport",
+    ) -> str:
         lines = ["#EXTM3U", "#EXT-X-VERSION:3", ""]
 
         included = 0
 
         for ch in channels:
-            if not ch.stream_url or not ch.stream_url.lower().endswith((".mpd", ".m3u8")):
+            if not ch.stream_url or not ch.stream_url.lower().endswith(
+                (".mpd", ".m3u8")
+            ):
                 continue
 
             included += 1
@@ -286,11 +309,11 @@ class SportzxClient:
             final_name = f"{event}{time_part}{channel_suffix}".strip()
 
             # Sanitize
-            clean_name = re.sub(r'[^\w\s\-\:\(\)\,\.\']', ' ', final_name).strip()
+            clean_name = re.sub(r"[^\w\s\-\:\(\)\,\.\']", " ", final_name).strip()
 
             group = ch.event_cat.capitalize() if ch.event_cat else "Sportzx"
 
-            tvg = re.sub(r'[^a-z0-9]', '', clean_name.lower())
+            tvg = re.sub(r"[^a-z0-9]", "", clean_name.lower())
             tvg_id = tvg[:50] if tvg else f"sportzx-{ch.event_id[:8]}"
 
             extinf = (
@@ -303,7 +326,9 @@ class SportzxClient:
 
             if ch.keyid and ch.key:
                 lines.append("#KODIPROP:inputstream.adaptive.license_type=clearkey")
-                lines.append(f"#KODIPROP:inputstream.adaptive.license_key={ch.keyid}:{ch.key}")
+                lines.append(
+                    f"#KODIPROP:inputstream.adaptive.license_key={ch.keyid}:{ch.key}"
+                )
 
             lines.append(ch.stream_url)
             lines.append("")
@@ -323,14 +348,69 @@ class SportzxClient:
 
 # ────────────────────────────────────────────────
 
+
+def generate_web_view_url(
+    channels: list[SportzxChannel],
+    player_host: str = "https://kratosrepo.github.io/drm-player",
+    include_without_keys: bool = False
+) -> list[dict]:
+    grouped: dict[str, dict] = {}
+    ungrouped = []
+
+    for ch in channels:
+        if not ch.stream_url:
+            continue
+
+        params = f"emmbed-url={ch.stream_url}"
+        if ch.keyid and ch.key:
+            params += f"&kid={ch.keyid}&key={ch.key}"
+
+        elif not include_without_keys:
+            continue
+
+        web_view_url = f"{player_host.rstrip('/')}?{params}"
+
+        stream_entry = {"web_view_url": web_view_url}
+        if ch.channel_title and ch.channel_title.strip():
+            stream_entry["channel_title"] = ch.channel_title.strip()
+
+        event_name = (
+            ch.event_name.strip() if ch.event_name and ch.event_name.strip() else None
+        )
+
+        if event_name:
+            if event_name not in grouped:
+                grouped[event_name] = {"event_name": event_name, "streams": []}
+                if ch.event_time and ch.event_time.strip():
+                    grouped[event_name]["event_time"] = ch.event_time.strip()
+
+            grouped[event_name]["streams"].append(stream_entry)
+
+        else:
+            entry = {"streams": [stream_entry]}
+            if ch.event_time and ch.event_time.strip():
+                entry["event_time"] = ch.event_time.strip()
+            ungrouped.append(entry)
+
+    return list(grouped.values()) + ungrouped
+
+
 if __name__ == "__main__":
     client = SportzxClient(
-        # excluded_categories=["adult", "test", "xxx"],
+        excluded_categories=["adult", "test", "xxx"],
         timeout=15
     )
 
     print("Fetching channels...")
     channels = client.get_channels()
+
+    print("Generating web-view urls")
+    web_views = generate_web_view_url(channels, "http://localhost:8000/DRM-player.html")
+
+    print(f"Saving {len(web_views)} web-views")
+
+    with open("web-view-urls.1.json", "w") as fh:
+        json.dump(web_views, fh, indent=4)
 
     print(f"Found {len(channels)} channels total")
 
@@ -339,7 +419,7 @@ if __name__ == "__main__":
         client.generate_m3u(
             channels=channels,
             filename="Sportzx.1.m3u8",
-            generic_logo="https://i.postimg.cc/xdhSY2xq/does-anyone-have-transparent-sportzx-icons-they-can-share-v0-wyufeqaxobff1.png"
+            generic_logo="https://i.postimg.cc/xdhSY2xq/does-anyone-have-transparent-sportzx-icons-they-can-share-v0-wyufeqaxobff1.png",
         )
     else:
         print("No channels found")
