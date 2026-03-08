@@ -3,7 +3,7 @@ name: Sportzx Scraper
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/10 * * * *'
 
 permissions:
   contents: write
@@ -27,12 +27,13 @@ jobs:
           pip install requests pycryptodome
 
       - name: Run Sportzx Scraper
-        run: python Sportzx.py
+        run: python Sportzx.1.py
 
-      - name: Commit and push updated M3U8 file
+      - name: Commit and push updated M3U8, webview-url files
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
           git add Sportzx.m3u8
-          git commit -m "Updated M3U8 file with new streams" || echo "No changes to commit"
+          git add web-view-urls.json
+          git commit -m "Updated M3U8, webview-urls with new streams" || echo "No changes to commit"
           git push
